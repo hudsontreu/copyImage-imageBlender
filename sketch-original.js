@@ -6,11 +6,12 @@ let canvas;
 let isProcessing = false;
 const SECTION_SIZE = 10;
 let processedPixels = [];
-let sectionsPerFrame = 5; // Default speed - sections processed per frame
-let blendAmount = 100;
+let sectionsPerFrame = 50; // Default speed - sections processed per frame
+let blendAmount = 0;
 let transitionSpeed = 0.0005;
 const NUM_TARGET_IMAGES = 5;
 let blendedTarget;
+let processedLayer;
 
 function preload() {
     // Load source image and multiple target images
@@ -21,13 +22,13 @@ function preload() {
 }
 
 function setup() {
-    // Set initial target images
-    currentTargetImage = targetImages[0];
-    nextTargetImage = targetImages[1];
-
     // Create canvas tall enough for all three images
     canvas = createCanvas(800, 900);
     background(0);
+    
+    // Set initial target images
+    currentTargetImage = targetImages[0];
+    nextTargetImage = targetImages[1];
     
     // Draw source and initial target images at the top
     image(sourceImage, 0, 0, 400, 300);
@@ -40,9 +41,26 @@ function setup() {
         }
     }
     
-    // Create graphics buffer for blending
+    // Create graphics buffers
     blendedTarget = createGraphics(800, 600);
+    processedLayer = createGraphics(800, 600);
     noTint();
+
+    // Create button
+    let loadButton = createButton('Load New Source');
+    loadButton.position(20, 20);
+    loadButton.class('loadButton');
+    loadButton.mousePressed(() => {
+        sourceImage = loadImage('https://picsum.photos/800/600?random=' + floor(random(1000)), () => {
+            // Reset processing state
+            processedPixels.forEach(p => p.processed = false);
+            processedLayer.clear();
+            isProcessing = false;
+            // Redraw top images
+            image(sourceImage, 0, 0, 400, 300);
+            image(currentTargetImage, 400, 0, 400, 300);
+        });
+    });
 }
 
 function updateTargetBlend() {
@@ -75,6 +93,12 @@ function updateTargetBlend() {
 function draw() {
     updateTargetBlend();
     
+    // Draw the blended target image in the background of the processing area
+    image(blendedTarget, 0, 300, 800, 600);
+    
+    // Draw the processed layer on top
+    image(processedLayer, 0, 300);
+    
     if (!isProcessing) return;
     
     // Process multiple sections per frame based on speed
@@ -82,6 +106,7 @@ function draw() {
         let unprocessed = processedPixels.filter(p => !p.processed);
         if (unprocessed.length === 0) {
             processedPixels.forEach(p => p.processed = false);
+            processedLayer.clear();
             continue;
         }
         
@@ -101,28 +126,29 @@ function draw() {
         // Copy and paste the matching section
         let sourceSection = sourceImage.get(bestMatch.x, bestMatch.y, SECTION_SIZE, SECTION_SIZE);
         
-        // Add some glitch effects
-        push();
-        translate(currentPixel.x + SECTION_SIZE/2, currentPixel.y + SECTION_SIZE/2);
+        // Add some glitch effects to the processed layer
+        processedLayer.push();
+        processedLayer.translate(currentPixel.x, currentPixel.y - 300);
         
         // Random slight rotation
-        rotate(random(-0.1, 0.1));
+        processedLayer.rotate(random(-0.1, 0.1));
         
         // Random slight scale
         let scale = random(0.95, 1.05);
-        image(sourceSection, -SECTION_SIZE/2, -SECTION_SIZE/2, SECTION_SIZE * scale, SECTION_SIZE * scale);
+        processedLayer.image(sourceSection, -SECTION_SIZE/2, -SECTION_SIZE/2, SECTION_SIZE * scale, SECTION_SIZE * scale);
         
         // Occasional RGB shift
         if (random() > 0.9) {
-            tint(255, 0, 0, 50);
-            image(sourceSection, random(-2, 2), random(-2, 2), SECTION_SIZE * scale, SECTION_SIZE * scale);
-            tint(0, 255, 0, 50);
-            image(sourceSection, random(-2, 2), random(-2, 2), SECTION_SIZE * scale, SECTION_SIZE * scale);
-            tint(0, 0, 255, 50);
-            image(sourceSection, random(-2, 2), random(-2, 2), SECTION_SIZE * scale, SECTION_SIZE * scale);
+            processedLayer.tint(255, 0, 0, 50);
+            processedLayer.image(sourceSection, random(-2, 2), random(-2, 2), SECTION_SIZE * scale, SECTION_SIZE * scale);
+            processedLayer.tint(0, 255, 0, 50);
+            processedLayer.image(sourceSection, random(-2, 2), random(-2, 2), SECTION_SIZE * scale, SECTION_SIZE * scale);
+            processedLayer.tint(0, 0, 255, 50);
+            processedLayer.image(sourceSection, random(-2, 2), random(-2, 2), SECTION_SIZE * scale, SECTION_SIZE * scale);
+            processedLayer.noTint();
         }
         
-        pop();
+        processedLayer.pop();
         
         // Mark this pixel as processed
         currentPixel.processed = true;
@@ -180,10 +206,8 @@ function colorDifference(c1, c2) {
 function keyPressed() {
     if (key === 'r' || key === 'R') {
         // Reset and start processing
-        background(0);
-        image(sourceImage, 0, 0, 400, 300);
-        image(currentTargetImage, 400, 0, 400, 300);
         processedPixels.forEach(p => p.processed = false);
+        processedLayer.clear();
         isProcessing = false;
     }
     if (key === ' ') {
