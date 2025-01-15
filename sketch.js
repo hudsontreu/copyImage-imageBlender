@@ -16,6 +16,7 @@ let pendingSourceImage = null;
 let isTargetPaused = false;
 let regionUpdateSpeed = 0.005; 
 let fillRate = 0.01;
+let uiVisible = true;
 
 function preload() {
     // Load shader files
@@ -38,23 +39,41 @@ function setup() {
     
     // Create UI container
     let uiContainer = createDiv('');
-    uiContainer.position(20, 20);
-    uiContainer.style('display', 'flex');
-    uiContainer.style('gap', '10px');
-    uiContainer.style('flex-wrap', 'wrap');
+    uiContainer.class('ui-container');
     
-    // Create buttons container
-    let buttonsContainer = createDiv('');
-    buttonsContainer.parent(uiContainer);
-    buttonsContainer.style('display', 'flex');
-    buttonsContainer.style('gap', '10px');
-    buttonsContainer.style('margin-bottom', '10px');
+    // Create UI toggle buttons (one for shown state, one for hidden state)
+    let hiddenToggle = createButton('<span>+</span>');
+    hiddenToggle.class('ui-toggle standalone');
+    hiddenToggle.style('display', 'none');
+    
+    let visibleToggle = createButton('<span>−</span>');
+    visibleToggle.class('ui-toggle');
+    visibleToggle.parent(uiContainer);
+    
+    // Setup toggle functionality
+    hiddenToggle.mousePressed(() => {
+        uiVisible = true;
+        uiContainer.class('ui-container');
+        hiddenToggle.style('display', 'none');
+        visibleToggle.style('display', 'block');
+    });
+    
+    visibleToggle.mousePressed(() => {
+        uiVisible = false;
+        uiContainer.class('ui-container hidden');
+        hiddenToggle.style('display', 'block');
+        visibleToggle.style('display', 'none');
+    });
+    
+    // Create buttons group
+    let buttonGroup = createDiv('');
+    buttonGroup.class('button-group');
+    buttonGroup.parent(uiContainer);
     
     // Create load button
-    let loadButton = createButton('Load New Source');
-    loadButton.parent(buttonsContainer);
+    let loadButton = createButton('[ + ] Load New Source');
+    loadButton.parent(buttonGroup);
     loadButton.mousePressed(() => {
-        // Start loading new source image while keeping the old one active
         pendingSourceImage = loadImage('https://picsum.photos/800/600?random=' + floor(random(1000)), () => {
             sourceImage = pendingSourceImage;
             pendingSourceImage = null;
@@ -65,69 +84,68 @@ function setup() {
     });
     
     // Create start/pause button
-    let startButton = createButton('Start Process');
-    startButton.parent(buttonsContainer);
+    let startButton = createButton('[ > ] Start Process');
+    startButton.parent(buttonGroup);
     startButton.mousePressed(() => {
         isProcessing = !isProcessing;
-        startButton.html(isProcessing ? 'Pause Process' : 'Start Process');
-    });
-    
-    // Create reset button
-    let resetButton = createButton('Reset');
-    resetButton.parent(buttonsContainer);
-    resetButton.mousePressed(() => {
-        processedAmount = 0;
-        isProcessing = false;
-        startButton.html('Start Process');
+        startButton.html(isProcessing ? '[ || ] Pause Process' : '[ > ] Start Process');
     });
     
     // Create target pause button
-    let pauseTargetButton = createButton('Pause Target');
-    pauseTargetButton.parent(buttonsContainer);
+    let pauseTargetButton = createButton('[ || ] Pause Target');
+    pauseTargetButton.parent(buttonGroup);
     pauseTargetButton.mousePressed(() => {
         isTargetPaused = !isTargetPaused;
-        pauseTargetButton.html(isTargetPaused ? 'Resume Target' : 'Pause Target');
+        pauseTargetButton.html(isTargetPaused ? '[ > ] Resume Target' : '[ || ] Pause Target');
     });
     
-    // Create sliders container
-    let slidersContainer = createDiv('');
-    slidersContainer.parent(uiContainer);
-    slidersContainer.style('display', 'flex');
-    slidersContainer.style('gap', '20px');
-    slidersContainer.style('align-items', 'center');
-    slidersContainer.style('flex-wrap', 'wrap');
-    
-    // Section Size slider
-    createSpan('Section Size: ').parent(slidersContainer);
-    let sectionSizeSlider = createSlider(2, 50, sectionSize, 1);
-    sectionSizeSlider.parent(slidersContainer);
-    sectionSizeSlider.input(() => {
-        sectionSize = sectionSizeSlider.value();
+    // Create reset button
+    let resetButton = createButton('[ x ] Reset');
+    resetButton.parent(buttonGroup);
+    resetButton.mousePressed(() => {
+        processedAmount = 0;
+        isProcessing = false;
+        startButton.html('[ > ] Start Process');
     });
     
-    // Max Coverage slider
-    createSpan('Max Coverage: ').parent(slidersContainer);
-    let maxCoverageSlider = createSlider(0.1, 1.0, maxCoverage, 0.05);
-    maxCoverageSlider.parent(slidersContainer);
-    maxCoverageSlider.input(() => {
-        maxCoverage = maxCoverageSlider.value();
+    // Add separator
+    let separator = createDiv('');
+    separator.class('separator');
+    separator.parent(uiContainer);
+    
+    // Create sliders
+    let sectionSizeSlider = createSliderControl(uiContainer, 'Section Size', 2, 50, sectionSize, 1, (value) => {
+        sectionSize = value;
     });
     
-    // Region Update Speed slider
-    createSpan('Region Change Speed: ').parent(slidersContainer);
-    let updateSpeedSlider = createSlider(0.0001, 0.01, regionUpdateSpeed, 0.0001);
-    updateSpeedSlider.parent(slidersContainer);
-    updateSpeedSlider.input(() => {
-        regionUpdateSpeed = updateSpeedSlider.value();
+    let maxCoverageSlider = createSliderControl(uiContainer, 'Max Coverage', 0.1, 1.0, maxCoverage, 0.05, (value) => {
+        maxCoverage = value;
     });
     
-    // Fill Rate slider
-    createSpan('Fill Rate: ').parent(slidersContainer);
-    let fillRateSlider = createSlider(0.0005, 0.02, fillRate, 0.0005);
-    fillRateSlider.parent(slidersContainer);
-    fillRateSlider.input(() => {
-        fillRate = fillRateSlider.value();
+    let updateSpeedSlider = createSliderControl(uiContainer, 'Region Speed', 0.0001, 0.01, regionUpdateSpeed, 0.0001, (value) => {
+        regionUpdateSpeed = value;
     });
+    
+    let fillRateSlider = createSliderControl(uiContainer, 'Fill Rate', 0.0005, 0.02, fillRate, 0.0005, (value) => {
+        fillRate = value;
+    });
+}
+
+// Helper function to create slider controls
+function createSliderControl(parent, label, min, max, value, step, callback) {
+    let container = createDiv('');
+    container.class('slider-container');
+    container.parent(parent);
+    
+    let labelElement = createDiv(label);
+    labelElement.class('slider-label');
+    labelElement.parent(container);
+    
+    let slider = createSlider(min, max, value, step);
+    slider.parent(container);
+    slider.input(() => callback(slider.value()));
+    
+    return slider;
 }
 
 function draw() {
