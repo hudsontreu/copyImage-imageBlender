@@ -4,15 +4,18 @@ let nextTargetImage;
 let targetImages = [];
 let canvas;
 let isProcessing = false;
-const SECTION_SIZE = 20;
+let sectionSize = 10;  
 let sectionsPerFrame = 1;
 let blendAmount = 100;
 let transitionSpeed = 0.01;
 const NUM_TARGET_IMAGES = 10;
-const MAX_COVERAGE = 0.9; // Maximum coverage of source regions (90%)
+let maxCoverage = 0.9;  
 let glitchShader; 
 let processedAmount = 0;
 let pendingSourceImage = null;
+let isTargetPaused = false;
+let regionUpdateSpeed = 0.005; 
+let fillRate = 0.01;
 
 function preload() {
     // Load shader files
@@ -38,10 +41,18 @@ function setup() {
     uiContainer.position(20, 20);
     uiContainer.style('display', 'flex');
     uiContainer.style('gap', '10px');
+    uiContainer.style('flex-wrap', 'wrap');
+    
+    // Create buttons container
+    let buttonsContainer = createDiv('');
+    buttonsContainer.parent(uiContainer);
+    buttonsContainer.style('display', 'flex');
+    buttonsContainer.style('gap', '10px');
+    buttonsContainer.style('margin-bottom', '10px');
     
     // Create load button
     let loadButton = createButton('Load New Source');
-    loadButton.parent(uiContainer);
+    loadButton.parent(buttonsContainer);
     loadButton.mousePressed(() => {
         // Start loading new source image while keeping the old one active
         pendingSourceImage = loadImage('https://picsum.photos/800/600?random=' + floor(random(1000)), () => {
@@ -55,7 +66,7 @@ function setup() {
     
     // Create start/pause button
     let startButton = createButton('Start Process');
-    startButton.parent(uiContainer);
+    startButton.parent(buttonsContainer);
     startButton.mousePressed(() => {
         isProcessing = !isProcessing;
         startButton.html(isProcessing ? 'Pause Process' : 'Start Process');
@@ -63,23 +74,73 @@ function setup() {
     
     // Create reset button
     let resetButton = createButton('Reset');
-    resetButton.parent(uiContainer);
+    resetButton.parent(buttonsContainer);
     resetButton.mousePressed(() => {
         processedAmount = 0;
         isProcessing = false;
         startButton.html('Start Process');
     });
+    
+    // Create target pause button
+    let pauseTargetButton = createButton('Pause Target');
+    pauseTargetButton.parent(buttonsContainer);
+    pauseTargetButton.mousePressed(() => {
+        isTargetPaused = !isTargetPaused;
+        pauseTargetButton.html(isTargetPaused ? 'Resume Target' : 'Pause Target');
+    });
+    
+    // Create sliders container
+    let slidersContainer = createDiv('');
+    slidersContainer.parent(uiContainer);
+    slidersContainer.style('display', 'flex');
+    slidersContainer.style('gap', '20px');
+    slidersContainer.style('align-items', 'center');
+    slidersContainer.style('flex-wrap', 'wrap');
+    
+    // Section Size slider
+    createSpan('Section Size: ').parent(slidersContainer);
+    let sectionSizeSlider = createSlider(2, 50, sectionSize, 1);
+    sectionSizeSlider.parent(slidersContainer);
+    sectionSizeSlider.input(() => {
+        sectionSize = sectionSizeSlider.value();
+    });
+    
+    // Max Coverage slider
+    createSpan('Max Coverage: ').parent(slidersContainer);
+    let maxCoverageSlider = createSlider(0.1, 1.0, maxCoverage, 0.05);
+    maxCoverageSlider.parent(slidersContainer);
+    maxCoverageSlider.input(() => {
+        maxCoverage = maxCoverageSlider.value();
+    });
+    
+    // Region Update Speed slider
+    createSpan('Region Change Speed: ').parent(slidersContainer);
+    let updateSpeedSlider = createSlider(0.0001, 0.01, regionUpdateSpeed, 0.0001);
+    updateSpeedSlider.parent(slidersContainer);
+    updateSpeedSlider.input(() => {
+        regionUpdateSpeed = updateSpeedSlider.value();
+    });
+    
+    // Fill Rate slider
+    createSpan('Fill Rate: ').parent(slidersContainer);
+    let fillRateSlider = createSlider(0.0005, 0.02, fillRate, 0.0005);
+    fillRateSlider.parent(slidersContainer);
+    fillRateSlider.input(() => {
+        fillRate = fillRateSlider.value();
+    });
 }
 
 function draw() {
     // Update blend amount for target transition
-    blendAmount += transitionSpeed;
-    if (blendAmount >= 1) {
-        blendAmount = 0;
-        currentTargetImage = nextTargetImage;
-        let currentIndex = targetImages.indexOf(currentTargetImage);
-        let nextIndex = (currentIndex + 1) % targetImages.length;
-        nextTargetImage = targetImages[nextIndex];
+    if (!isTargetPaused) {
+        blendAmount += transitionSpeed;
+        if (blendAmount >= 1) {
+            blendAmount = 0;
+            currentTargetImage = nextTargetImage;
+            let currentIndex = targetImages.indexOf(currentTargetImage);
+            let nextIndex = (currentIndex + 1) % targetImages.length;
+            nextTargetImage = targetImages[nextIndex];
+        }
     }
     
     // Use the glitch shader
@@ -90,9 +151,9 @@ function draw() {
     glitchShader.setUniform('currentTarget', currentTargetImage);
     glitchShader.setUniform('nextTarget', nextTargetImage);
     glitchShader.setUniform('blendAmount', blendAmount);
-    glitchShader.setUniform('time', frameCount * 0.01);
+    glitchShader.setUniform('time', frameCount * regionUpdateSpeed);
     glitchShader.setUniform('resolution', [width, height]);
-    glitchShader.setUniform('sectionSize', float(SECTION_SIZE));
+    glitchShader.setUniform('sectionSize', float(sectionSize));
     glitchShader.setUniform('glitchIntensity', 0.1);
     glitchShader.setUniform('processedAmount', processedAmount);
     
@@ -101,7 +162,7 @@ function draw() {
     
     // Update processed amount if processing
     if (isProcessing) {
-        processedAmount = min(processedAmount + 0.01, MAX_COVERAGE);
+        processedAmount = min(processedAmount + fillRate, maxCoverage);
     }
 }
 

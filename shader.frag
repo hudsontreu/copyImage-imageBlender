@@ -45,8 +45,8 @@ vec2 findBestMatch(vec2 targetUV, vec4 targetColor) {
     // Use fixed number of samples for WebGL compatibility
     for(int i = 0; i < 10; i++) {
         vec2 randomUV = vec2(
-            hash(vec2(targetUV.x + float(i), time)),
-            hash(vec2(targetUV.y + float(i), time))
+            hash(vec2(targetUV.x + float(i), time * 10.0)), // Increased time influence
+            hash(vec2(targetUV.y + float(i), time * 10.0))  // Increased time influence
         );
         vec4 sampleColor = getAverageColor(sourceTexture, randomUV, sectionSize);
         float diff = length(targetColor - sampleColor);
@@ -62,11 +62,13 @@ vec2 findBestMatch(vec2 targetUV, vec4 targetColor) {
 
 void main() {
     vec2 uv = vTexCoord;
-    uv.y = 1.0 - uv.y; // Flip Y coordinate
+    uv.y = 1.0 - uv.y;
     
-    // Get the current grid cell
+    // Get the current grid cell with time-based offset
     vec2 cell = floor(uv * resolution / sectionSize);
-    float cellHash = hash(cell);
+    float timeOffset = time * 20.0; // Increased time scale for more noticeable movement
+    vec2 animatedCell = cell + vec2(cos(timeOffset + hash(cell) * 6.28), sin(timeOffset + hash(cell.yx) * 6.28));
+    float cellHash = hash(animatedCell);
     
     // Get colors from current and next target
     vec4 currentColor = texture2D(currentTarget, uv);
@@ -76,25 +78,23 @@ void main() {
     vec2 currentSourceUV = findBestMatch(uv, currentColor);
     vec2 nextSourceUV = findBestMatch(uv, nextColor);
     
-    // Only process if within processed amount
-    if(cellHash < processedAmount) {
-        // Get source colors for both matches
-        vec4 currentSourceColor = texture2D(sourceTexture, currentSourceUV);
-        vec4 nextSourceColor = texture2D(sourceTexture, nextSourceUV);
-        
-        // Blend between the two source matches
+    // Animate the threshold with time
+    float animatedThreshold = processedAmount * (1.0 + 0.2 * sin(timeOffset + hash(cell) * 6.28));
+    
+    if(cellHash < animatedThreshold) {
         vec2 sourceUV = mix(currentSourceUV, nextSourceUV, blendAmount);
         
-        // Add some glitch effects
-        float glitchOffset = (hash(uv + time) * 2.0 - 1.0) * glitchIntensity;
+        // Add time-based glitch effects
+        float glitchOffset = sin(timeOffset * 0.5 + hash(uv) * 6.28) * glitchIntensity;
         sourceUV += vec2(glitchOffset) / resolution;
         
-        // RGB shift
-        if(hash(cell + time) > 0.9) {
+        // RGB shift with time-based animation
+        if(hash(animatedCell) > 0.9) {
+            float shiftAmount = (1.0 + sin(timeOffset)) * 2.0;
             vec4 shifted = vec4(
-                texture2D(sourceTexture, sourceUV + vec2(2.0, 0.0) / resolution).r,
+                texture2D(sourceTexture, sourceUV + vec2(shiftAmount, 0.0) / resolution).r,
                 texture2D(sourceTexture, sourceUV).g,
-                texture2D(sourceTexture, sourceUV - vec2(2.0, 0.0) / resolution).b,
+                texture2D(sourceTexture, sourceUV - vec2(shiftAmount, 0.0) / resolution).b,
                 1.0
             );
             gl_FragColor = shifted;
