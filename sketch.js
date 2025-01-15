@@ -9,8 +9,10 @@ let sectionsPerFrame = 1;
 let blendAmount = 100;
 let transitionSpeed = 0.01;
 const NUM_TARGET_IMAGES = 10;
+const MAX_COVERAGE = 0.9; // Maximum coverage of source regions (90%)
 let glitchShader; 
 let processedAmount = 0;
+let pendingSourceImage = null;
 
 function preload() {
     // Load shader files
@@ -31,15 +33,41 @@ function setup() {
     currentTargetImage = targetImages[0];
     nextTargetImage = targetImages[1];
     
-    // Create button
+    // Create UI container
+    let uiContainer = createDiv('');
+    uiContainer.position(20, 20);
+    uiContainer.style('display', 'flex');
+    uiContainer.style('gap', '10px');
+    
+    // Create load button
     let loadButton = createButton('Load New Source');
-    loadButton.position(20, 20);
-    loadButton.class('loadButton');
+    loadButton.parent(uiContainer);
     loadButton.mousePressed(() => {
-        sourceImage = loadImage('https://picsum.photos/800/600?random=' + floor(random(1000)), () => {
-            processedAmount = 0;
-            isProcessing = false;
+        // Start loading new source image while keeping the old one active
+        pendingSourceImage = loadImage('https://picsum.photos/800/600?random=' + floor(random(1000)), () => {
+            sourceImage = pendingSourceImage;
+            pendingSourceImage = null;
+            if (!isProcessing) {
+                processedAmount = 0;
+            }
         });
+    });
+    
+    // Create start/pause button
+    let startButton = createButton('Start Process');
+    startButton.parent(uiContainer);
+    startButton.mousePressed(() => {
+        isProcessing = !isProcessing;
+        startButton.html(isProcessing ? 'Pause Process' : 'Start Process');
+    });
+    
+    // Create reset button
+    let resetButton = createButton('Reset');
+    resetButton.parent(uiContainer);
+    resetButton.mousePressed(() => {
+        processedAmount = 0;
+        isProcessing = false;
+        startButton.html('Start Process');
     });
 }
 
@@ -73,7 +101,7 @@ function draw() {
     
     // Update processed amount if processing
     if (isProcessing) {
-        processedAmount = min(processedAmount + 0.01, 1.0);
+        processedAmount = min(processedAmount + 0.01, MAX_COVERAGE);
     }
 }
 
@@ -82,10 +110,6 @@ function keyPressed() {
         // Reset processing
         processedAmount = 0;
         isProcessing = false;
-    }
-    if (key === ' ') {
-        // Toggle processing
-        isProcessing = !isProcessing;
     }
     // Speed controls
     if (keyCode === UP_ARROW) {
