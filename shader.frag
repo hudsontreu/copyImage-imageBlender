@@ -38,8 +38,7 @@ vec4 getAverageColor(sampler2D tex, vec2 uv, float size) {
 }
 
 // Find best matching section from source
-vec2 findBestMatch(vec2 targetUV) {
-    vec4 targetColor = getAverageColor(currentTarget, targetUV, sectionSize);
+vec2 findBestMatch(vec2 targetUV, vec4 targetColor) {
     float bestDiff = 999999.0;
     vec2 bestUV = targetUV;
     
@@ -69,15 +68,22 @@ void main() {
     vec2 cell = floor(uv * resolution / sectionSize);
     float cellHash = hash(cell);
     
-    // Blend between current and next target
+    // Get colors from current and next target
     vec4 currentColor = texture2D(currentTarget, uv);
     vec4 nextColor = texture2D(nextTarget, uv);
-    vec4 targetColor = mix(currentColor, nextColor, blendAmount);
+    
+    // Find best matches for both current and next target
+    vec2 currentSourceUV = findBestMatch(uv, currentColor);
+    vec2 nextSourceUV = findBestMatch(uv, nextColor);
     
     // Only process if within processed amount
     if(cellHash < processedAmount) {
-        // Find matching section from source
-        vec2 sourceUV = findBestMatch(uv);
+        // Get source colors for both matches
+        vec4 currentSourceColor = texture2D(sourceTexture, currentSourceUV);
+        vec4 nextSourceColor = texture2D(sourceTexture, nextSourceUV);
+        
+        // Blend between the two source matches
+        vec2 sourceUV = mix(currentSourceUV, nextSourceUV, blendAmount);
         
         // Add some glitch effects
         float glitchOffset = (hash(uv + time) * 2.0 - 1.0) * glitchIntensity;
@@ -91,11 +97,11 @@ void main() {
                 texture2D(sourceTexture, sourceUV - vec2(2.0, 0.0) / resolution).b,
                 1.0
             );
-            gl_FragColor = mix(targetColor, shifted, 0.5);
+            gl_FragColor = shifted;
         } else {
             gl_FragColor = texture2D(sourceTexture, sourceUV);
         }
     } else {
-        gl_FragColor = targetColor;
+        gl_FragColor = mix(currentColor, nextColor, blendAmount);
     }
 }

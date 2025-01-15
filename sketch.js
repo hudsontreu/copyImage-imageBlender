@@ -8,7 +8,7 @@ const SECTION_SIZE = 20;
 let sectionsPerFrame = 1;
 let blendAmount = 100;
 let transitionSpeed = 0.01;
-const NUM_TARGET_IMAGES = 5;
+const NUM_TARGET_IMAGES = 10;
 let glitchShader; 
 let processedAmount = 0;
 
